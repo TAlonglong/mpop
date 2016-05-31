@@ -3,6 +3,7 @@
 # Copyright (c) 2016.
 #from tifffile.tifffile import TIFF_TAGS
 from TiffImagePlugin import IMAGEDESCRIPTION
+from libxml2mod import last
 
 # Author(s):
 
@@ -37,89 +38,6 @@ import xml_read
 
 logger = logging.getLogger(__name__)
 
-#-------------------------------------------------------------------------------
-#
-# Read MiTIFF products config file.
-#
-#-------------------------------------------------------------------------------
-def get_product_config(product_name, force_read=False):
-    """Read MiTIFF configuration entry for a given product name.
-
-    :Parameters:
-        product_name : str
-            Name of MiTIFF product.
-
-    :Arguments:
-        force_read : Boolean
-            Force re-reading config file.
-
-    **Notes**:
-        * It will look for a *mitiff_products.cfg* in MPOP's
-          configuration directory defined by *PPP_CONFIG_DIR*.
-        * As an example, see *mitiff_products.cfg.template* in
-          MPOP's *etc* directory.
-    """
-    return ProductConfigs()(product_name, force_read)
-
-
-class _Singleton(type):
-    def __init__(cls, name_, bases_, dict_):
-        super(_Singleton, cls).__init__(name_, bases_, dict_)
-        cls.instance = None
-
-    def __call__(cls, *args, **kwargs):
-        if cls.instance is None:
-            cls.instance = super(_Singleton, cls).__call__(*args, **kwargs)
-        return cls.instance
-
-class ProductConfigs(object):
-    __metaclass__ = _Singleton
-
-    def __init__(self):
-        self.read_config()
-
-    def __call__(self, product_name, force_read=False):
-        if force_read:
-            self.read_config()
-        return self._products[product_name]
-
-    @property
-    def product_names(self):
-        return sorted(self._products.keys())
-
-    def read_config(self):
-        from ConfigParser import ConfigParser
-
-        def _eval(val):
-            try:
-                return eval(val)
-            except:
-                return str(val)
-
-        filename = self._find_a_config_file()
-        logger.info("Reading MiTIFF config file: '%s'" % filename)
-
-        cfg = ConfigParser()
-        cfg.read(filename)
-        products = {}
-        for sec in cfg.sections():
-            prd = {}
-            for key, val in cfg.items(sec):
-                prd[key] = _eval(val)
-                logger.debug("%s %s" % (key,prd[key]))
-            products[sec] = prd
-        self._products = products
-
-    @staticmethod
-    def _find_a_config_file():
-        name_ = 'mitiff_products.cfg'
-        home_ = os.path.dirname(os.path.abspath(__file__))
-        penv_ = os.environ.get('PPP_CONFIG_DIR', '')
-        for fname_ in [os.path.join(x, name_) for x in (home_, penv_)]:
-            if os.path.isfile(fname_):
-                return fname_
-        raise ValueError("Could not find a MiTIFF config file")
-
 def save(scene, filename, product_name=None):
     """Saves the scene as a MITIFF file. This format can be read by DIANA
 
@@ -132,21 +50,41 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
     """ Write data to MITIFF file. """
     print "Inside mitiff_writer ... "
 
+    import xml.etree.ElementTree as etree
 
     name_ = 'mitiff_products.xml'
     penv_ = os.environ.get('PPP_CONFIG_DIR', '')
     fname_ = os.path.join(penv_,name_)
     if os.path.isfile(fname_):
-        config = xml_read.parse_xml(xml_read.get_root(fname_))
+        tree = etree.parse(fname_)
+        root = tree.getroot()
+
+        #config = xml_read.parse_xml(xml_read.get_root(fname_))
     #raise ValueError("Could not find a MiTIFF config file ", fname_)
-
     
-    #if mitiff_product_name:
-    #    options = deepcopy(get_product_config(mitiff_product_name))
-    #else:
-    #    print "No MiTIFF product name given. Skip Config. Sure you want this?"
-    #   options = {}
+    print "instrument_name: ", root_object.instrument_name
+    
+    product_list = root.findall("product[@instrument_name='%s']" % (root_object.instrument_name))
+    #product_iter = root.iterfind("product[@instrument_name='%s']" % (root_object.instrument_name))
 
+    product_list_length = len(product_list)
+    
+    if product_list_length == 0:
+        raise ValueError("No configuration mitiff product for this instrument is found: ", root_object.instrument_name)
+    elif product_list_length != 1:
+        raise ValueError("More than one configuration mitiff product for this instrument, '%s',  found. Please check your config." % (root_object.instrument_name))
+        
+
+    for elem in product_list:
+        print "product_list : ", elem.tag, elem.attrib['instrument_name']
+
+    product_channels = root.findall("product[@instrument_name='%s']/channel" % (root_object.instrument_name))
+    for ch in product_channels:
+        print ch.items()
+        
+    #for child in root:
+    #    print "loop: ", child
+    #    print "loop2: ", child.tag, child.attrib
 
     #print root_object
     tifargs = dict()
@@ -157,17 +95,21 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
     tif = TIFF.open(filename, mode ='w')
     #print dir(tif)
     
-    #np.set_printoptions(threshold=np.nan)
-    
-    #tif.TIFFSetField(tif,IMAGEDESCRIPTION,"test")
     tif.SetField(IMAGEDESCRIPTION, "TEST")
-    for ch in root_object.channels:
-        print ch
-        print ch.info.get('units', 'None')
-        #print ch.data
-        data=ch.data.astype(np.uint8)
-        tif.write_image(data,)
-        
+    for ch in product_channels:
+        found_channel = False
+        print ch.attrib['name']
+        for channels in root_object.channels:
+            if ch.attrib['name'] == channels.name:
+                data=channels.data.astype(np.uint8)
+                tif.write_image(data,)
+                found_channel = True
+                break
+        if not found_channel:
+            logger.debug("Could not find configured channel in read data set. Fill with empty.")
+            fill_channel = np.zeros(root_object.channels[0].data.shape,dtype=np.uint8)
+            tif.write_image(fill_channel)
+            
     tif.close
     
 if __name__ == '__main__':
