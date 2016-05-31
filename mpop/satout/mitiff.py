@@ -3,7 +3,8 @@
 # Copyright (c) 2016.
 #from tifffile.tifffile import TIFF_TAGS
 from TiffImagePlugin import IMAGEDESCRIPTION
-from libxml2mod import last
+#from libxml2mod import last
+#from aifc import data
 
 # Author(s):
 
@@ -29,11 +30,13 @@ from libxml2mod import last
 
 __revision__ = 0.1
 
+KELVIN_TO_CELSIUS = -273.15
+
 import os
 import numpy as np
 import logging
 from copy import deepcopy
-import xml_read
+#import xml_read
 #import xml.etree.ElementTree as etree
 
 logger = logging.getLogger(__name__)
@@ -62,7 +65,7 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
         #config = xml_read.parse_xml(xml_read.get_root(fname_))
     #raise ValueError("Could not find a MiTIFF config file ", fname_)
     
-    print "instrument_name: ", root_object.instrument_name
+    #print "instrument_name: ", root_object.instrument_name
     
     product_list = root.findall("product[@instrument_name='%s']" % (root_object.instrument_name))
     #product_iter = root.iterfind("product[@instrument_name='%s']" % (root_object.instrument_name))
@@ -82,10 +85,6 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
     for ch in product_channels:
         print ch.items()
         
-    #for child in root:
-    #    print "loop: ", child
-    #    print "loop2: ", child.tag, child.attrib
-
     #print root_object
     tifargs = dict()
     args={}
@@ -95,21 +94,43 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
     tif = TIFF.open(filename, mode ='w')
     #print dir(tif)
     
+    np.set_printoptions(threshold=np.nan)
+    
     tif.SetField(IMAGEDESCRIPTION, "TEST")
     for ch in product_channels:
         found_channel = False
         print ch.attrib['name']
         for channels in root_object.channels:
             if ch.attrib['name'] == channels.name:
-                data=channels.data.astype(np.uint8)
-                tif.write_image(data,)
+                #Need to scale the data set to mitiff 0-255. 0 is no/missing/bad data.
+                logger.debug("min %f max %f value" % (float(ch.attrib['min-val']),float(ch.attrib['max-val'])))
+                reverse_offset = 0.
+                reverse_scale = 1.
+                if ch.attrib['calibration'] == "BT":
+                    reverse_offset = 255.
+                    reverse_scale = -1.
+                    channels.data += KELVIN_TO_CELSIUS
+                    #print channels.data
+                    
+                logger.debug("Reverse offset: %f reverse scale: %f" % ( reverse_offset,reverse_scale))
+
+                _mask = channels.data.mask
+                _data = np.clip(channels.data, float(ch.attrib['min-val']),float(ch.attrib['max-val']))
+
+                data=reverse_offset + reverse_scale*(((_data-float(ch.attrib['min-val']))/(float(ch.attrib['max-val']) - float(ch.attrib['min-val'])))*255.)
+
+                data[_mask] = 0
+
+                tif.write_image(data.astype(np.uint8),)
                 found_channel = True
                 break
+
         if not found_channel:
             logger.debug("Could not find configured channel in read data set. Fill with empty.")
             fill_channel = np.zeros(root_object.channels[0].data.shape,dtype=np.uint8)
             tif.write_image(fill_channel)
-            
+        
+
     tif.close
     
 if __name__ == '__main__':
