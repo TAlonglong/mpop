@@ -29,7 +29,7 @@ from pyparsing import Upcase
 """mpop mitiff writer interface.
 """
 
-__revision__ = 0.1
+__revision__ = 0.2
 
 KELVIN_TO_CELSIUS = -273.15
 
@@ -42,17 +42,17 @@ from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
-def save(scene, filename, product_name=None):
+def save(scene, filename):
     """Saves the scene as a MITIFF file. This format can be read by DIANA
 
     """
-    print "inside save ... "
-    return mitiff_writer(filename, scene, mitiff_product_name=product_name)
+    logger.debug("inside save ... ")
+    return mitiff_writer(filename, scene)
 
 
-def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=None):
+def mitiff_writer(filename, root_object, compression=True):
     """ Write data to MITIFF file. """
-    print "Inside mitiff_writer ... "
+    logger.debug("Inside mitiff_writer ... ")
 
     import xml.etree.ElementTree as etree
 
@@ -62,10 +62,9 @@ def mitiff_writer(filename, root_object, compression=True, mitiff_product_name=N
     if os.path.isfile(fname_):
         tree = etree.parse(fname_)
         root = tree.getroot()
-
-        #config = xml_read.parse_xml(xml_read.get_root(fname_))
-    #raise ValueError("Could not find a MiTIFF config file ", fname_)
-    
+    else:
+        raise IOError("Could not find %s. Check if this file is available at this location." % (fname_))
+        
     #print "instrument_name: ", root_object.instrument_name
     
     product_list = root.findall("product[@instrument_name='%s']" % (root_object.instrument_name))
@@ -272,6 +271,9 @@ def _make_image_description(ro, pc):
             else:
                 logger.warning("Unknown calib type. Must be Radiance, Reflectance or BT.")
 
+            #How to format string by passing the format
+            #http://stackoverflow.com/questions/1598579/rounding-decimals-with-new-python-format-function
+            
             _image_description += ', 8, [ '
             for val in range(0,256):
                 #Comma separated list of values
@@ -306,7 +308,3 @@ if __name__ == '__main__':
     
     save(local_data,"test.mitiff",product_name="AVHRR")
     print "Complete."
-    
-    
-    
-    
