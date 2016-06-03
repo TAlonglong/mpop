@@ -96,6 +96,9 @@ class GeoImage(Image):
         if fformat.lower() in ('tif', 'tiff'):
             return self.geotiff_save(filename, compression, tags,
                                      gdal_options, blocksize, **kwargs)
+        elif fformat.lower() in ('mitiff'):
+            logger.info("Writing to mitiff ....")
+
         try:
             # Let image.pil_save it ?
             Image.save(self, filename, compression, fformat=fformat)
