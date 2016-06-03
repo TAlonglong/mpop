@@ -42,7 +42,7 @@ from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
-def save(scene, filename):
+def save(scene, filename, **options):
     """Saves the scene as a MITIFF file. This format can be read by DIANA
 
     """
@@ -235,13 +235,13 @@ def _make_image_description(ro, pc):
     _image_description += ' By: %.6f' % (ro.area.area_extent[3]/1000.) #UR_y
     _image_description += '\n'
     
-    logger.debug("Area extent: ",ro.area.area_extent)
+    logger.debug("Area extent: {}".format(ro.area.area_extent))
 
     for ch in pc:        
         palette=False
         #Make calibration.
         if palette:
-            logging.debug("Do palette calibration")
+            logging.debug("Do palette calibration. Not implemented yet.")
         else:
             _image_description += 'Table_calibration: '
             if 'name-alias' in ch.keys():
