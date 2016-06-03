@@ -504,6 +504,7 @@ class SatelliteInstrumentScene(SatelliteScene):
         formats are:
 
         - *netcdf4*: NetCDF4 with CF conventions.
+        - *mitiff*: MITIFF format, TIFF file with image description tag holding the geolocation info. Used by DIANA at Norwegian MET
         """
         to_format = fformat
         writer = "satout." + to_format
