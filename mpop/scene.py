@@ -499,14 +499,16 @@ class SatelliteInstrumentScene(SatelliteScene):
 
         self.channels_to_load = set()
 
-    def save(self, filename, to_format="netcdf4", **options):
+    def save(self, filename, fformat="netcdf4", compression=None, **options):
         """Saves the current scene into a file of format *to_format*. Supported
         formats are:
 
         - *netcdf4*: NetCDF4 with CF conventions.
         """
-
+        to_format = fformat
         writer = "satout." + to_format
+        LOG.debug("writer module: %s" %(writer))
+
         try:
             writer_module = __import__(writer, globals(), locals(), ["save"])
         except ImportError, err:
