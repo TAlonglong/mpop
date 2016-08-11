@@ -166,6 +166,7 @@ class GeostationaryFactory(object):
                      variant=''):
         """Create a compound satellite scene.
         """
+        LOG.debug("create_scene")
 
         return GenericFactory.create_scene(satname, satnumber, instrument,
                                            time_slot, None, area, variant)
@@ -182,6 +183,8 @@ class PolarFactory(object):
         """Create a compound satellite scene.
         """
 
+        LOG.debug("create_scene")
+
         return GenericFactory.create_scene(satname, satnumber, instrument,
                                            time_slot, orbit, area, variant)
 
@@ -190,6 +193,7 @@ class GenericFactory(object):
 
     """Factory for generic satellite scenes.
     """
+    LOG.critical("GenericFactory")
 
     @staticmethod
     def create_scene(satname, satnumber, instrument, time_slot, orbit,
@@ -208,6 +212,7 @@ class GenericFactory(object):
         compositer = get_sat_instr_compositer(satellite, instrument)
         instrument_scene._CompositerClass = compositer
 
+        LOG.critical("instrument_scene: {}".format(instrument_scene))
         if compositer is not None:
             # Pass weak ref to compositor to allow garbage collection
             instrument_scene.image = compositer(

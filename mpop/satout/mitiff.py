@@ -106,7 +106,9 @@ def mitiff_writer(filename, root_object, compression=True):
     for ch in product_channels:
         found_channel = False
         print ch.attrib['name']
+        print root_object.channels
         for channels in root_object.channels:
+            print channels
             if ch.attrib['name'] == channels.name:
                 #Need to scale the data set to mitiff 0-255. 0 is no/missing/bad data.
                 logger.debug("min %f max %f value" % (float(ch.attrib['min-val']),float(ch.attrib['max-val'])))
@@ -133,7 +135,12 @@ def mitiff_writer(filename, root_object, compression=True):
 
         if not found_channel:
             logger.debug("Could not find configured channel in read data set. Fill with empty.")
-            fill_channel = np.zeros(root_object.channels[0].data.shape,dtype=np.uint8)
+            try:
+                fill_channel = np.zeros(root_object.channels[0].data.shape,dtype=np.uint8)
+            except IndexError as ie:
+                logger.error("Index out out bounds for channels[0].data.shape. Try area instead ... {}".format(ie))
+                fill_channel = np.zeros(root_object.area.shape,dtype=np.uint8)
+                
             tif.write_image(fill_channel)
         
 
@@ -216,8 +223,9 @@ def _make_image_description(ro, pc):
         _image_description += ' +units=km'
         
     
-    _image_description += ' +x_0=%.6f' % (-ro.area.area_extent[0])
-    _image_description += ' +y_0=%.6f' % (-ro.area.area_extent[1])
+    #Need to use center of lower left pixel. Subtract half a pixel size
+    _image_description += ' +x_0=%.6f' % (-ro.area.area_extent[0]-ro.area.pixel_size_x/2.)
+    _image_description += ' +y_0=%.6f' % (-ro.area.area_extent[1]-ro.area.pixel_size_y/2.)
     
     _image_description += '\n'
     _image_description += ' TrueLat: 60N\n'
@@ -231,8 +239,9 @@ def _make_image_description(ro, pc):
     _image_description += ' Ax: %.6f' % (ro.area.pixel_size_x/1000.)
     _image_description += ' Ay: %.6f' % (ro.area.pixel_size_y/1000.)
     #But this ads up to upper left corner of upper left pixel.
-    _image_description += ' Bx: %.6f' % (ro.area.area_extent[0]/1000.) #LL_x
-    _image_description += ' By: %.6f' % (ro.area.area_extent[3]/1000.) #UR_y
+    #But need to use the center of the pixel. Therefor use the center of the upper left pixel.
+    _image_description += ' Bx: %.6f' % (ro.area.area_extent[0]/1000. + ro.area.pixel_size_x/1000./2.) #LL_x
+    _image_description += ' By: %.6f' % (ro.area.area_extent[3]/1000. - ro.area.pixel_size_y/1000./2.) #UR_y
     _image_description += '\n'
     
     logger.debug("Area extent: {}".format(ro.area.area_extent))
